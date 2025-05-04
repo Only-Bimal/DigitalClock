@@ -1,0 +1,47 @@
+﻿<Window x:Class="DigitalClock.MainWindow"
+		xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+		mc:Ignorable="d"
+		Title="Digital Clock" Background="{x:Null}" ShowInTaskbar="False" AllowsTransparency="True" WindowStyle="None" Closing="Window_Closing" 
+		ResizeMode="CanResizeWithGrip" WindowState="Minimized" IsTabStop="False" SizeToContent="WidthAndHeight"  Loaded="Window_Loaded" Height="509" Width="1863">
+	<Grid MouseLeftButtonDown="Grid_MouseLeftButtonDown"  ScrollViewer.HorizontalScrollBarVisibility="Auto" 
+	       Margin="0,0,0,0" >
+		<Grid.RowDefinitions>
+			<RowDefinition Height="35*"/>
+			<RowDefinition Height="19*"/>
+		</Grid.RowDefinitions>
+		<!--<Grid.RenderTransform>
+			<TransformGroup>
+				<ScaleTransform ScaleX="1.5" ScaleY="1.5"/>
+			</TransformGroup>
+		</Grid.RenderTransform>-->
+		<Grid.ContextMenu>
+			<ContextMenu>
+				<MenuItem Header="Change Color" Click="ChangeColor_Click" />
+				<Separator />
+				<MenuItem x:Name="DisplayOnTop" Header="Display On Top" IsCheckable="True" Unchecked="DisplayOnTop_Unchecked" Checked="DisplayOnTop_Checked" />
+				<MenuItem x:Name="StartWithWindows" Header="Start With Windows" IsCheckable="True" Unchecked="StartWithWindows_Unchecked" Checked="StartWithWindows_Checked" />
+				<Separator />
+				<MenuItem Header="Close" Click="Close_Click" />
+			</ContextMenu>
+		</Grid.ContextMenu>
+		<Label x:Name="ClockTimes" RenderOptions.CachingHint="Cache" 
+		       Content="88:88" HorizontalAlignment="Center" HorizontalContentAlignment="Center" 
+		       VerticalContentAlignment="Center" Foreground="White" FontFamily="SVN-Aleo" FontSize="360" FontWeight="ExtraBold" 
+		       Width="1972" Height="350" VerticalAlignment="Top" Margin="0,0,0,0"  >
+			<Label.Effect>
+				<DropShadowEffect Color="Gray"/>
+			</Label.Effect>
+		</Label>
+		<Label x:Name="ClockDates" RenderOptions.CachingHint="Cache" 
+		       Content="Wednesday, 00 September 0000" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" 
+		       Foreground="White" FontFamily="SVN-Aleo" FontSize="120" FontWeight="Bold" VerticalAlignment="Top" 
+		       Width="1972" Height="173" Grid.Row="1">
+			<Label.Effect>
+				<DropShadowEffect Color="Gray"/>
+			</Label.Effect>
+		</Label>
+	</Grid>
+</Window>
