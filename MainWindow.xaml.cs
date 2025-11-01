@@ -21,12 +21,44 @@ namespace DigitalClock
     /// </summary>
     public partial class MainWindow
     {
+        // Constants for registry keys
         private const string OnTop = "OnTop";
-        private const string DigitalClock = "DigitalClock";
+        private string DigitalClock = "DigitalClock" + Prefix;
         private bool _isExit;
         private string runLocation = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
-        private string appSettingsLocation = @"Software\DigitalClock";
+        private string appSettingsLocation = @"Software\DigitalClock" + Prefix;
         private static SolidColorBrush AccentColor => (SolidColorBrush)SystemParameters.WindowGlassBrush;
+
+        /// <summary>Gets a value indicating whether the assembly was built in debug mode.</summary>
+        public static bool IsDebug
+        {
+            get
+            {
+                bool isDebug = false;
+
+#if (DEBUG)
+                isDebug = true;
+#else
+                isDebug = false;
+#endif
+
+                return isDebug;
+            }
+        }
+
+        /// <summary>Gets a value indicating whether the assembly was built in release mode.</summary>
+        public bool IsRelease
+        {
+            get { return !IsDebug; }
+        }
+
+        private static string Prefix
+        {
+            get
+            {
+                return IsDebug ? "\\Debug" : "\\Release";
+            }
+        }
 
         public MainWindow()
         {
@@ -44,6 +76,8 @@ namespace DigitalClock
 
                     ClockTimes.Dispatcher.Invoke(new Action(() => ClockTimes.Foreground = AccentColor));
                     ClockDates.Dispatcher.Invoke(new Action(() => ClockDates.Foreground = AccentColor));
+
+                    //UpdateColor();
 
                     Thread.Sleep(1000); // sleep
                     if (_isExit) { return; }
@@ -70,7 +104,7 @@ namespace DigitalClock
             catch (Exception ex)
             {
                 Console.WriteLine(ex.ToString());
-                MessageBox.Show("Unable to set start-up value to true.\n" + ex.Message);
+                MessageBox.Show("Unable to set start-up topValue to true.\n" + ex.Message);
             }
         }
 
@@ -99,11 +133,16 @@ namespace DigitalClock
         {
             if (!(SystemParameters.WindowGlassBrush is SolidColorBrush accentColor))
             {
+                Console.WriteLine("Unable to get accent color." + SystemParameters.WindowGlassBrush);
                 return;
             }
 
-            ClockTimes.Foreground = accentColor;
-            ClockDates.Foreground = accentColor;
+            Color contrastColor = accentColor.Color.GetContrastingColor();
+            contrastColor.A = 255; // Set alpha to 255 for full opacity
+
+
+            ClockTimes.Foreground = new SolidColorBrush(contrastColor); ;
+            ClockDates.Foreground = new SolidColorBrush(contrastColor);
         }
 
         // start with windows context menu unchecked event
@@ -198,16 +237,21 @@ namespace DigitalClock
             Left = (display.Bounds.Left / 2) - (Width / 2) - 50;
             Top = (display.Bounds.Height / 2) - (Height / 2) - 100;
 
-            //Get location from registry.
-            double top = (double)Registry.CurrentUser.GetValue(appSettingsLocation + "\\Top", Top);
-            double left = (double)Registry.CurrentUser.GetValue(appSettingsLocation + "\\Left", Left);
-            double width = (double)Registry.CurrentUser.GetValue(appSettingsLocation + "\\Width", Width);
-            double height = (double)Registry.CurrentUser.GetValue(appSettingsLocation + "\\Height", Height);
-            //Set the location and size
-            Top = top;
-            Left = left;
-            Width = width;
-            Height = height;
+            // Auto Start with Windows
+            using (var key = Registry.CurrentUser.CreateSubKey(appSettingsLocation, true))
+            {
+                object topValue = key?.GetValue("Top", Top);
+                Top = Convert.ToDouble(topValue);
+
+                object leftValue = key?.GetValue("Left", Left);
+                Left = Convert.ToDouble(leftValue);
+
+                object heightValue = key?.GetValue("Height", Height);
+                Height = Convert.ToDouble(heightValue);
+
+                object widthValue = key?.GetValue("Width", Width);
+                Width = Convert.ToDouble(widthValue);
+            }
 
             Loaded += Window_Loaded;
         }
@@ -216,5 +260,7 @@ namespace DigitalClock
         {
             WindowState = WindowState.Normal;
         }
+
+
     }
 }

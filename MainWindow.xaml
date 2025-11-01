@@ -5,9 +5,9 @@
 		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 		mc:Ignorable="d"
 		Title="Digital Clock" Background="{x:Null}" ShowInTaskbar="False" AllowsTransparency="True" WindowStyle="None" Closing="Window_Closing" 
-		ResizeMode="CanResizeWithGrip" WindowState="Minimized" IsTabStop="False" SizeToContent="WidthAndHeight"  Loaded="Window_Loaded" Height="509" Width="1863">
+		ResizeMode="CanResizeWithGrip" WindowState="Minimized" IsTabStop="False" SizeToContent="WidthAndHeight"  Loaded="Window_Loaded" Height="436" Width="1800">
 	<Grid MouseLeftButtonDown="Grid_MouseLeftButtonDown"  ScrollViewer.HorizontalScrollBarVisibility="Auto" 
-	       Margin="0,0,0,0" >
+	       Margin="0,0,0,0" Height="500" >
 		<Grid.RowDefinitions>
 			<RowDefinition Height="35*"/>
 			<RowDefinition Height="19*"/>
@@ -28,9 +28,8 @@
 			</ContextMenu>
 		</Grid.ContextMenu>
 		<Label x:Name="ClockTimes" RenderOptions.CachingHint="Cache" 
-		       Content="88:88" HorizontalAlignment="Center" HorizontalContentAlignment="Center" 
-		       VerticalContentAlignment="Center" Foreground="White" FontFamily="SVN-Aleo" FontSize="360" FontWeight="ExtraBold" 
-		       Width="1972" Height="350" VerticalAlignment="Top" Margin="0,0,0,0"  >
+		       Content="88:88" HorizontalAlignment="Center" HorizontalContentAlignment="Center" Foreground="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" FontFamily="SVN-Aleo" FontSize="360" 
+		       Width="1000" Height="335" Padding="1,1,1,1" VerticalAlignment="Center" Margin="0,-105,0,0" FontWeight="DemiBold"  >
 			<Label.Effect>
 				<DropShadowEffect Color="Gray"/>
 			</Label.Effect>
@@ -38,7 +37,7 @@
 		<Label x:Name="ClockDates" RenderOptions.CachingHint="Cache" 
 		       Content="Wednesday, 00 September 0000" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" 
 		       Foreground="White" FontFamily="SVN-Aleo" FontSize="120" FontWeight="Bold" VerticalAlignment="Top" 
-		       Width="1972" Height="173" Grid.Row="1">
+		       Width="1820" Height="150" Margin="0,281,0,0" Grid.RowSpan="2">
 			<Label.Effect>
 				<DropShadowEffect Color="Gray"/>
 			</Label.Effect>
