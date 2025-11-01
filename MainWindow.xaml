@@ -5,42 +5,41 @@
 		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 		mc:Ignorable="d"
 		Title="Digital Clock" Background="{x:Null}" ShowInTaskbar="False" AllowsTransparency="True" WindowStyle="None" Closing="Window_Closing" 
-		ResizeMode="CanResizeWithGrip" WindowState="Minimized" IsTabStop="False" SizeToContent="WidthAndHeight"  Loaded="Window_Loaded" Height="436" Width="1800">
-	<Grid MouseLeftButtonDown="Grid_MouseLeftButtonDown"  ScrollViewer.HorizontalScrollBarVisibility="Auto" 
-	       Margin="0,0,0,0" Height="500" >
-		<Grid.RowDefinitions>
-			<RowDefinition Height="35*"/>
-			<RowDefinition Height="19*"/>
-		</Grid.RowDefinitions>
-		<!--<Grid.RenderTransform>
+		ResizeMode="CanResizeWithGrip" WindowState="Minimized" IsTabStop="False" SizeToContent="WidthAndHeight"  Loaded="Window_Loaded" Height="436" Width="1800" VerticalAlignment="Center" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+    <Grid MouseLeftButtonDown="Grid_MouseLeftButtonDown"  ScrollViewer.HorizontalScrollBarVisibility="Auto" >
+        <Grid.RowDefinitions>
+            <RowDefinition Height="35*"/>
+            <RowDefinition Height="19*"/>
+        </Grid.RowDefinitions>
+        <!--<Grid.RenderTransform>
 			<TransformGroup>
 				<ScaleTransform ScaleX="1.5" ScaleY="1.5"/>
 			</TransformGroup>
 		</Grid.RenderTransform>-->
-		<Grid.ContextMenu>
-			<ContextMenu>
-				<MenuItem Header="Change Color" Click="ChangeColor_Click" />
-				<Separator />
-				<MenuItem x:Name="DisplayOnTop" Header="Display On Top" IsCheckable="True" Unchecked="DisplayOnTop_Unchecked" Checked="DisplayOnTop_Checked" />
-				<MenuItem x:Name="StartWithWindows" Header="Start With Windows" IsCheckable="True" Unchecked="StartWithWindows_Unchecked" Checked="StartWithWindows_Checked" />
-				<Separator />
-				<MenuItem Header="Close" Click="Close_Click" />
-			</ContextMenu>
-		</Grid.ContextMenu>
-		<Label x:Name="ClockTimes" RenderOptions.CachingHint="Cache" 
-		       Content="88:88" HorizontalAlignment="Center" HorizontalContentAlignment="Center" Foreground="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" FontFamily="SVN-Aleo" FontSize="360" 
-		       Width="1000" Height="335" Padding="1,1,1,1" VerticalAlignment="Center" Margin="0,-105,0,0" FontWeight="DemiBold"  >
-			<Label.Effect>
-				<DropShadowEffect Color="Gray"/>
-			</Label.Effect>
-		</Label>
-		<Label x:Name="ClockDates" RenderOptions.CachingHint="Cache" 
-		       Content="Wednesday, 00 September 0000" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" 
-		       Foreground="White" FontFamily="SVN-Aleo" FontSize="120" FontWeight="Bold" VerticalAlignment="Top" 
-		       Width="1820" Height="150" Margin="0,281,0,0" Grid.RowSpan="2">
-			<Label.Effect>
-				<DropShadowEffect Color="Gray"/>
-			</Label.Effect>
-		</Label>
-	</Grid>
+        <Grid.ContextMenu>
+            <ContextMenu>
+                <MenuItem Header="Change Color" Click="ChangeColor_Click" />
+                <Separator />
+                <MenuItem x:Name="DisplayOnTop" Header="Display On Top" IsCheckable="True" Unchecked="DisplayOnTop_Unchecked" Checked="DisplayOnTop_Checked" />
+                <MenuItem x:Name="StartWithWindows" Header="Start With Windows" IsCheckable="True" Unchecked="StartWithWindows_Unchecked" Checked="StartWithWindows_Checked" />
+                <Separator />
+                <MenuItem Header="Close" Click="Close_Click" />
+            </ContextMenu>
+        </Grid.ContextMenu>
+        <Label x:Name="ClockTimes" RenderOptions.CachingHint="Cache" 
+			   Content="88:88" HorizontalAlignment="Center" Foreground="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" FontFamily="SVN-Aleo" FontSize="360" 
+			   Width="876" Height="330" Padding="1,1,1,1" VerticalAlignment="Top" FontWeight="DemiBold" HorizontalContentAlignment="Stretch" Margin="0,-60,0,0"  >
+            <Label.Effect>
+                <DropShadowEffect Color="Gray"/>
+            </Label.Effect>
+        </Label>
+        <Label x:Name="ClockDates" RenderOptions.CachingHint="Cache" 
+			   Content="Wednesday, 00 September 0000" HorizontalAlignment="Center" 
+			   Foreground="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" FontFamily="SVN-Aleo" FontSize="120" FontWeight="Bold" VerticalAlignment="Top" 
+			   Width="1820" Height="150" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="1,1,1,1" Margin="0,282,0,0" Grid.RowSpan="2">
+            <Label.Effect>
+                <DropShadowEffect Color="Gray"/>
+            </Label.Effect>
+        </Label>
+    </Grid>
 </Window>

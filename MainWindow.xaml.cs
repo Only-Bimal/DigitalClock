@@ -1,13 +1,12 @@
 ﻿using System;
 using System.ComponentModel;
-using System.Globalization;
 using System.Linq;
 using System.Reflection;
-using System.Threading;
 using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 using Microsoft.Win32;
 
@@ -23,8 +22,7 @@ namespace DigitalClock
     {
         // Constants for registry keys
         private const string OnTop = "OnTop";
-        private string DigitalClock = "DigitalClock" + Prefix;
-        private bool _isExit;
+        private readonly string DigitalClock = "DigitalClock" + Prefix;
         private string runLocation = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
         private string appSettingsLocation = @"Software\DigitalClock" + Prefix;
         private static SolidColorBrush AccentColor => (SolidColorBrush)SystemParameters.WindowGlassBrush;
@@ -60,31 +58,24 @@ namespace DigitalClock
             }
         }
 
+        private readonly DispatcherTimer _timer = new DispatcherTimer();
+
         public MainWindow()
         {
             InitializeComponent();
             // Set Location
             SetLocation();
-            // configure clock
-            _clock = new Thread(() =>
+
+            _timer.Interval = TimeSpan.FromSeconds(1);
+            _timer.Tick += (s, e) =>
             {
-                while (true)
-                {
-                    // update date and time by Realtime
-                    ClockTimes.Dispatcher.Invoke(new Action(() => ClockTimes.Content = DateTime.Now.ToString("HH:mm")));
-                    ClockDates.Dispatcher.Invoke(new Action(() => ClockDates.Content = DateTime.Now.ToString("dddd, dd MMMM yyyy")));
-
-                    ClockTimes.Dispatcher.Invoke(new Action(() => ClockTimes.Foreground = AccentColor));
-                    ClockDates.Dispatcher.Invoke(new Action(() => ClockDates.Foreground = AccentColor));
-
-                    //UpdateColor();
-
-                    Thread.Sleep(1000); // sleep
-                    if (_isExit) { return; }
-                }
-            });
-            // start digital clock
-            _clock.Start();
+                ClockTimes.Content = DateTime.Now.ToString("HH:mm");
+                ClockDates.Content = DateTime.Now.ToString("dddd, dd MMMM yyyy");
+                //ClockTimes.Foreground = AccentColor;
+                //ClockDates.Foreground = AccentColor;
+                UpdateColor();
+            };
+            _timer.Start();
 
             // do not make this program crash
             try
@@ -101,15 +92,13 @@ namespace DigitalClock
                     Topmost = DisplayOnTop.IsChecked == true;
                 }
             }
+
             catch (Exception ex)
             {
                 Console.WriteLine(ex.ToString());
                 MessageBox.Show("Unable to set start-up topValue to true.\n" + ex.Message);
             }
         }
-
-        // create new thread variable
-        private readonly Thread _clock;
 
         // drag the digital clock
         private void Grid_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -120,7 +109,6 @@ namespace DigitalClock
         // close context menu
         private void Close_Click(object sender, RoutedEventArgs e)
         {
-            _isExit = true;
             Close();
         }
 
@@ -138,11 +126,13 @@ namespace DigitalClock
             }
 
             Color contrastColor = accentColor.Color.GetContrastingColor();
-            contrastColor.A = 255; // Set alpha to 255 for full opacity
+            contrastColor.A = 200; // Set alpha to 255 for full opacity
 
 
-            ClockTimes.Foreground = new SolidColorBrush(contrastColor); ;
+            ClockTimes.Foreground = new SolidColorBrush(contrastColor);
             ClockDates.Foreground = new SolidColorBrush(contrastColor);
+            //ClockTimes.Foreground = AccentColor;
+            //ClockDates.Foreground = AccentColor;
         }
 
         // start with windows context menu unchecked event
@@ -211,9 +201,6 @@ namespace DigitalClock
                 }
             }
             catch { MessageBox.Show("Unable to set Values."); }
-
-            _isExit = true;
-            _clock.Abort();
         }
 
         private void SetLocation()
