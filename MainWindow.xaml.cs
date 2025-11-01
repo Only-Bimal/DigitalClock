@@ -14,7 +14,6 @@ using MessageBox = System.Windows.MessageBox;
 
 namespace DigitalClock
 {
-
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
@@ -59,6 +58,7 @@ namespace DigitalClock
         }
 
         private readonly DispatcherTimer _timer = new DispatcherTimer();
+        private NotifyIcon _notifyIcon;
 
         public MainWindow()
         {
@@ -98,6 +98,70 @@ namespace DigitalClock
                 Console.WriteLine(ex.ToString());
                 MessageBox.Show("Unable to set start-up topValue to true.\n" + ex.Message);
             }
+
+            // Initialize system tray icon
+            InitializeTrayIcon();
+        }
+
+        private void InitializeTrayIcon()
+        {
+            _notifyIcon = new NotifyIcon
+            {
+                Icon = System.Drawing.Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location),
+                Visible = true,
+                Text = "DigitalClock"
+            };
+
+            // Create context menu for tray icon
+            var trayMenu = new ContextMenuStrip();
+
+            // Add menu items (reuse WPF context menu items)
+            trayMenu.Items.Add("Show", null, (s, e) => ShowWindow());
+            trayMenu.Items.Add(new ToolStripSeparator());
+
+            // Add your existing context menu items
+            trayMenu.Items.Add("Change Color", null, (s, e) => Dispatcher.Invoke(() => ChangeColor_Click(null, null)));
+            trayMenu.Items.Add("Display On Top", null, (s, e) => Dispatcher.Invoke(() => DisplayOnTop.IsChecked = !DisplayOnTop.IsChecked));
+            trayMenu.Items.Add("Start With Windows", null, (s, e) => Dispatcher.Invoke(() => StartWithWindows.IsChecked = !StartWithWindows.IsChecked));
+            trayMenu.Items.Add(new ToolStripSeparator());
+            trayMenu.Items.Add("Close", null, (s, e) => Dispatcher.Invoke(() => Close()));
+
+            _notifyIcon.ContextMenuStrip = trayMenu;
+
+            _notifyIcon.DoubleClick += (s, e) => ShowWindow();
+        }
+
+        private void ShowWindow()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (WindowState == WindowState.Minimized)
+                {
+                    Show();
+                    WindowState = WindowState.Normal;
+                    Activate();
+                }
+                else
+                {
+                    Show();
+                    Activate();
+                }
+            });
+        }
+
+        protected override void OnStateChanged(EventArgs e)
+        {
+            base.OnStateChanged(e);
+            if (WindowState == WindowState.Minimized)
+            {
+                Hide();
+            }
+        }
+
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            _notifyIcon?.Dispose();
+            base.OnClosing(e);
         }
 
         // drag the digital clock
@@ -131,8 +195,6 @@ namespace DigitalClock
 
             ClockTimes.Foreground = new SolidColorBrush(contrastColor);
             ClockDates.Foreground = new SolidColorBrush(contrastColor);
-            //ClockTimes.Foreground = AccentColor;
-            //ClockDates.Foreground = AccentColor;
         }
 
         // start with windows context menu unchecked event
@@ -247,7 +309,5 @@ namespace DigitalClock
         {
             WindowState = WindowState.Normal;
         }
-
-
     }
 }
