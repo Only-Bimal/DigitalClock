@@ -21,6 +21,7 @@ namespace DigitalClock
     {
         // Constants for registry keys
         private const string OnTop = "OnTop";
+        private const string NotifyIconVisibleKey = "NotifyIconVisible";
         private readonly string DigitalClock = "DigitalClock" + Prefix;
         private string runLocation = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
         private string appSettingsLocation = @"Software\DigitalClock" + Prefix;
@@ -65,6 +66,12 @@ namespace DigitalClock
             InitializeComponent();
             // Set Location
             SetLocation();
+            UpdateNotifyIconMenuHeader();
+
+            // Attach ContextMenuOpening event for Grid
+            var grid = this.Content as System.Windows.Controls.Grid;
+            if (grid != null)
+                grid.ContextMenuOpening += Grid_ContextMenuOpening;
 
             _timer.Interval = TimeSpan.FromSeconds(1);
             _timer.Tick += (s, e) =>
@@ -83,13 +90,19 @@ namespace DigitalClock
                 // Auto Start with Windows
                 using (var key = Registry.CurrentUser.CreateSubKey(runLocation, true))
                 {
-                    StartWithWindows.IsChecked = (key?.GetValue(DigitalClock, null) != null);
+                    var startWithWindowsMenu = (System.Windows.Controls.MenuItem)FindName("StartWithWindows");
+                    if (startWithWindowsMenu != null)
+                        startWithWindowsMenu.IsChecked = (key?.GetValue(DigitalClock, null) != null);
                 }
                 // Display on top
                 using (var key = Registry.CurrentUser.CreateSubKey(appSettingsLocation, true))
                 {
-                    DisplayOnTop.IsChecked = Convert.ToBoolean(key?.GetValue(OnTop, "False"));
-                    Topmost = DisplayOnTop.IsChecked == true;
+                    var displayOnTopMenu = (System.Windows.Controls.MenuItem)FindName("DisplayOnTop");
+                    if (displayOnTopMenu != null)
+                    {
+                        displayOnTopMenu.IsChecked = Convert.ToBoolean(key?.GetValue(OnTop, "False"));
+                        Topmost = displayOnTopMenu.IsChecked == true;
+                    }
                 }
             }
 
@@ -105,11 +118,18 @@ namespace DigitalClock
 
         private void InitializeTrayIcon()
         {
+            bool notifyIconVisible = true;
+            using (var key = Registry.CurrentUser.CreateSubKey(appSettingsLocation, true))
+            {
+                object value = key?.GetValue(NotifyIconVisibleKey, "True");
+                notifyIconVisible = Convert.ToBoolean(value);
+            }
+
             _notifyIcon = new NotifyIcon
             {
                 Icon = System.Drawing.Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location),
-                Visible = true,
-                Text = "DigitalClock"
+                Visible = notifyIconVisible,
+                Text = "Digital Clock"
             };
 
             // Create context menu for tray icon
@@ -121,14 +141,42 @@ namespace DigitalClock
 
             // Add your existing context menu items
             trayMenu.Items.Add("Change Color", null, (s, e) => Dispatcher.Invoke(() => ChangeColor_Click(null, null)));
-            trayMenu.Items.Add("Display On Top", null, (s, e) => Dispatcher.Invoke(() => DisplayOnTop.IsChecked = !DisplayOnTop.IsChecked));
-            trayMenu.Items.Add("Start With Windows", null, (s, e) => Dispatcher.Invoke(() => StartWithWindows.IsChecked = !StartWithWindows.IsChecked));
+            trayMenu.Items.Add("Display On Top", null, (s, e) => Dispatcher.Invoke(() => {
+                var menu = (System.Windows.Controls.MenuItem)FindName("DisplayOnTop");
+                if (menu != null) menu.IsChecked = !menu.IsChecked;
+            }));
+
+            trayMenu.Items.Add("Start With Windows", null, (s, e) => Dispatcher.Invoke(() => {
+                var menu = (System.Windows.Controls.MenuItem)FindName("StartWithWindows");
+                if (menu != null) menu.IsChecked = !menu.IsChecked;
+            }));
+
             trayMenu.Items.Add(new ToolStripSeparator());
+            // Add toggle notification icon menu item
+            var toggleNotifyIconItem = new ToolStripMenuItem(notifyIconVisible ? "Hide Notification Icon" : "Show Notification Icon");
+            toggleNotifyIconItem.Click += (s, e) => ToggleNotifyIconVisibility(toggleNotifyIconItem);
+            trayMenu.Items.Add(toggleNotifyIconItem);
             trayMenu.Items.Add("Close", null, (s, e) => Dispatcher.Invoke(() => Close()));
 
             _notifyIcon.ContextMenuStrip = trayMenu;
 
             _notifyIcon.DoubleClick += (s, e) => ShowWindow();
+        }
+
+        private void ToggleNotifyIconVisibility(ToolStripMenuItem menuItem)
+        {
+            bool newVisible = !_notifyIcon.Visible;
+            _notifyIcon.Visible = newVisible;
+            // Update tray menu text if applicable
+            if (menuItem != null)
+                menuItem.Text = newVisible ? "Hide Notification Icon" : "Show Notification Icon";
+            // Update WPF context menu text
+            UpdateNotifyIconMenuHeader();
+            // Save to registry
+            using (var key = Registry.CurrentUser.CreateSubKey(appSettingsLocation, true))
+            {
+                key?.SetValue(NotifyIconVisibleKey, newVisible);
+            }
         }
 
         private void ShowWindow()
@@ -267,34 +315,34 @@ namespace DigitalClock
 
         private void SetLocation()
         {
-            Screen display;
             var screens = Screen.AllScreens;
-            var firstSecondary = screens.FirstOrDefault(s => s.Primary == false);
-            if (firstSecondary != null)
+            Screen targetScreen = null;
+            if (screens.Length == 1)
             {
-                display = firstSecondary;
+                // Only one monitor: use the primary
+                targetScreen = screens[0];
             }
             else
             {
-                display = screens.First();
+                // More than one monitor: use the first secondary (not primary)
+                foreach (var screen in screens)
+                {
+                    if (!screen.Primary)
+                    {
+                        targetScreen = screen;
+                        break;
+                    }
+                }
+                // Fallback: if all are primary (should not happen), use the first
+                if (targetScreen == null)
+                    targetScreen = screens[0];
             }
 
             WindowStartupLocation = WindowStartupLocation.Manual;
-            // Ensure Window is minimized on creation
-            WindowState = WindowState.Minimized;
-            // Define Position on Secondary screen, for "Normal" window-mode
-            Left = (display.Bounds.Left / 2) - (Width / 2) - 50;
-            Top = (display.Bounds.Height / 2) - (Height / 2) - 100;
 
-            // Auto Start with Windows
+            // Optionally, you can still restore size if you want:
             using (var key = Registry.CurrentUser.CreateSubKey(appSettingsLocation, true))
             {
-                object topValue = key?.GetValue("Top", Top);
-                Top = Convert.ToDouble(topValue);
-
-                object leftValue = key?.GetValue("Left", Left);
-                Left = Convert.ToDouble(leftValue);
-
                 object heightValue = key?.GetValue("Height", Height);
                 Height = Convert.ToDouble(heightValue);
 
@@ -302,12 +350,79 @@ namespace DigitalClock
                 Width = Convert.ToDouble(widthValue);
             }
 
+            // Set Width/Height if not already set (fallback to default)
+            if (double.IsNaN(Width) || Width == 0)
+                Width = 800;
+            if (double.IsNaN(Height) || Height == 0)
+                Height = 400;
+
+            // Always center the window on the target screen (ignore saved position)
+            Left = targetScreen.Bounds.Left + (targetScreen.Bounds.Width - Width) / 2;
+            Top = targetScreen.Bounds.Top + (targetScreen.Bounds.Height - Height) / 2;
+
             Loaded += Window_Loaded;
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             WindowState = WindowState.Normal;
+            // Re-center after possible resize
+            SetLocation();
+        }
+
+        private void ShowWindow_Click(object sender, RoutedEventArgs e)
+        {
+            ShowWindow();
+        }
+
+        private void ToggleNotifyIcon_Click(object sender, RoutedEventArgs e)
+        {
+            // Use the same logic as tray icon toggle
+            ToggleNotifyIconVisibility(null);
+
+            // The header is now updated by UpdateNotifyIconMenuHeader
+        }
+
+        private void UpdateNotifyIconMenuHeader()
+        {
+            // Update Window.ContextMenu
+            var wpfMenuItem = (System.Windows.Controls.MenuItem)FindName("ToggleNotifyIcon");
+            if (wpfMenuItem != null)
+                wpfMenuItem.Header = _notifyIcon != null && _notifyIcon.Visible ? "Hide Notification Icon" : "Show Notification Icon";
+
+            // Update Grid.ContextMenu (if present)
+            var grid = this.Content as System.Windows.Controls.Grid;
+            if (grid != null)
+            {
+                var gridContextMenu = grid.ContextMenu;
+                if (gridContextMenu != null)
+                {
+                    foreach (var item in gridContextMenu.Items)
+                    {
+                        var menuItem = item as System.Windows.Controls.MenuItem;
+                        if (menuItem != null && (menuItem.Name == "ToggleNotifyIcon" || menuItem.Header.ToString().Contains("Notification Icon")))
+                        {
+                            menuItem.Header = _notifyIcon != null && _notifyIcon.Visible ? "Hide Notification Icon" : "Show Notification Icon";
+                        }
+                    }
+                }
+            }
+        }
+
+        private void Grid_ContextMenuOpening(object sender, System.Windows.Controls.ContextMenuEventArgs e)
+        {
+            var grid = sender as System.Windows.Controls.Grid;
+            if (grid != null && grid.ContextMenu != null)
+            {
+                foreach (var item in grid.ContextMenu.Items)
+                {
+                    var menuItem = item as System.Windows.Controls.MenuItem;
+                    if (menuItem != null && (menuItem.Name == "ToggleNotifyIcon" || menuItem.Header.ToString().Contains("Notification Icon")))
+                    {
+                        menuItem.Header = _notifyIcon != null && _notifyIcon.Visible ? "Hide Notification Icon" : "Show Notification Icon";
+                    }
+                }
+            }
         }
     }
 }
