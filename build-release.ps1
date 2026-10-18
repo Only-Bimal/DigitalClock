@@ -130,12 +130,12 @@ if ($SkipSign) {
             [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
         )
     } else {
-        Write-Host "Generating self-signed certificate: 'CN=DigitalClock (Bimal)'..." -ForegroundColor Gray
+        Write-Host "Generating self-signed certificate: 'CN=Digital Clock (Bimal)'..." -ForegroundColor Gray
         $cert = New-SelfSignedCertificate `
             -Type CodeSigningCert `
-            -Subject "CN=DigitalClock (Bimal)" `
+            -Subject "CN=Digital Clock (Bimal)" `
             -CertStoreLocation "Cert:\CurrentUser\My" `
-            -NotAfter (Get-Date).AddYears(5) `
+            -NotAfter (Get-Date).AddYears(10) `
             -KeyExportPolicy Exportable
         $isTempCert = $true
     }

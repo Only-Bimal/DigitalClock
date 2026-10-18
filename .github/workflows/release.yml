@@ -36,27 +36,35 @@ jobs:
         id: meta
         shell: pwsh
         run: |
-          # Determine Version
-          $tag = "${{ github.ref_name }}"
+          # Determine Version and Tag
+          $inputRef = "${{ github.ref_name }}"
           if ("${{ github.event_name }}" -eq "workflow_dispatch" -and "${{ github.event.inputs.tag_name }}") {
-            $tag = "${{ github.event.inputs.tag_name }}"
+            $inputRef = "${{ github.event.inputs.tag_name }}"
           }
           
-          # Extract version number without leading 'v'
+          # Extract version number from input tag or csproj
           $csproj = [xml](Get-Content "DigitalClock.csproj")
           $projVersion = $csproj.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
           
-          if ($tag -match '^Version:([0-9]+(\.[0-9]+)+.*)$') {
+          if ($inputRef -match '([0-9]+(\.[0-9]+)+.*)$') {
             $version = $Matches[1]
-            if (-not $tag.StartsWith("Version:")) { $tag = "Version:$version" }
+          } elseif ($projVersion) {
+            $version = $projVersion
           } else {
-            $version = if ($projVersion) { $projVersion } else { "2.6.0" }
-            $tag = "Version:$version"
+            $version = "2.6.0"
           }
 
-          Write-Host "Releasing version: $version with tag: $tag"
+          # Git tag name must be a valid git ref without colons (e.g. v2.6.0)
+          $tag = if ($inputRef -and $inputRef -notmatch ':') { $inputRef } else { "v$version" }
+          if (-not $tag.StartsWith("v")) { $tag = "v$version" }
+
+          # Release Title displayed in GitHub UI
+          $title = "Version:$version"
+
+          Write-Host "Releasing version: $version with git tag: $tag and title: $title"
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=$tag" >> $env:GITHUB_OUTPUT
+          "title=$title" >> $env:GITHUB_OUTPUT
 
           # Extract Release Notes from CHANGELOG.md
           $shortVersion = $version -replace '(\.[0-9]+)\.0$', '$1'
@@ -233,7 +241,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
-          name: DigitalClock ${{ steps.meta.outputs.version }}
+          name: ${{ steps.meta.outputs.title }}
           body: ${{ steps.meta.outputs.notes }}
           files: |
             artifacts/DigitalClock-*.zip
