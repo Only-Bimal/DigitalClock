@@ -1,0 +1,243 @@
+name: Build, Sign, Package & Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name to release (e.g. v2.6.0). Defaults to project version if blank.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    name: Build, Sign & Release (win-x64)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Determine Version and Release Notes
+        id: meta
+        shell: pwsh
+        run: |
+          # Determine Version
+          $tag = "${{ github.ref_name }}"
+          if ("${{ github.event_name }}" -eq "workflow_dispatch" -and "${{ github.event.inputs.tag_name }}") {
+            $tag = "${{ github.event.inputs.tag_name }}"
+          }
+          
+          # Extract version number without leading 'v'
+          $csproj = [xml](Get-Content "DigitalClock.csproj")
+          $projVersion = $csproj.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          
+          if ($tag -match '^Version:([0-9]+(\.[0-9]+)+.*)$') {
+            $version = $Matches[1]
+            if (-not $tag.StartsWith("Version:")) { $tag = "Version:$version" }
+          } else {
+            $version = if ($projVersion) { $projVersion } else { "2.6.0" }
+            $tag = "Version:$version"
+          }
+
+          Write-Host "Releasing version: $version with tag: $tag"
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
+          # Extract Release Notes from CHANGELOG.md
+          $shortVersion = $version -replace '(\.[0-9]+)\.0$', '$1'
+          $notes = ""
+          if (Test-Path "CHANGELOG.md") {
+            $content = Get-Content "CHANGELOG.md" -Raw
+            # Match section header like ### v2.6 or ### v2.6.0
+            $escapedShort = [regex]::Escape($shortVersion)
+            $escapedFull = [regex]::Escape($version)
+            $regex = "(?ms)###\s+v?($escapedFull|$escapedShort)\b(.*?)(?=\n###|\Z)"
+            if ($content -match $regex) {
+              $notes = $Matches[2].Trim()
+            }
+          }
+
+          if ([string]::IsNullOrWhiteSpace($notes)) {
+            $notes = "Release $tag of DigitalClock."
+          }
+
+          # Multiline output for GitHub actions
+          $delimiter = [System.Guid]::NewGuid().ToString()
+          "notes<<$delimiter" >> $env:GITHUB_OUTPUT
+          $notes >> $env:GITHUB_OUTPUT
+          "$delimiter" >> $env:GITHUB_OUTPUT
+
+      - name: Publish Framework-Dependent Executable
+        shell: pwsh
+        run: |
+          $publishDir = "publish_output"
+          New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
+          
+          # Publish single-file win-x64 binary to keep download size ultra-low (~1.5 MB)
+          dotnet publish DigitalClock.csproj `
+            -c Release `
+            -r win-x64 `
+            --no-self-contained `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:DebugType=none `
+            -p:DebugSymbols=false `
+            -o $publishDir
+
+          if (-not (Test-Path "$publishDir\DigitalClock.exe")) {
+            throw "Build artifact DigitalClock.exe was not generated."
+          }
+
+      - name: Sign Executable & Export Public Certificate
+        shell: pwsh
+        env:
+          WINDOWS_CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $exePath = "publish_output\DigitalClock.exe"
+          $artifactsDir = "artifacts"
+          New-Item -ItemType Directory -Force -Path $artifactsDir | Out-Null
+          $publicCertPath = "$artifactsDir\DigitalClock-PublicCert.cer"
+
+          $cert = $null
+          $tempPfx = $null
+
+          if ($env:WINDOWS_CERT_BASE64) {
+            Write-Host "Found WINDOWS_CERT_BASE64 secret. Importing custom code signing certificate..."
+            $certBytes = [System.Convert]::FromBase64String($env:WINDOWS_CERT_BASE64)
+            $tempPfx = [System.IO.Path]::GetTempFileName() + ".pfx"
+            [System.IO.File]::WriteAllBytes($tempPfx, $certBytes)
+            $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(
+              $tempPfx,
+              $env:WINDOWS_CERT_PASSWORD,
+              [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
+            )
+          } else {
+            Write-Host "No custom certificate secret provided. Generating self-signed certificate: 'CN=Digital Clock (Bimal)'..."
+            $cert = New-SelfSignedCertificate `
+              -Type CodeSigningCert `
+              -Subject "CN=Digital Clock (Bimal)" `
+              -CertStoreLocation "Cert:\CurrentUser\My" `
+              -NotAfter (Get-Date).AddYears(10) `
+              -KeyExportPolicy Exportable
+          }
+
+          # Export Public Certificate (.cer) so users can install into Trusted Root if desired
+          Write-Host "Exporting public certificate to $publicCertPath..."
+          Export-Certificate -Cert $cert -FilePath $publicCertPath | Out-Null
+
+          # Sign DigitalClock.exe using SHA-256 and RFC 3161 Timestamp Server
+          Write-Host "Signing $exePath with Set-AuthenticodeSignature..."
+          $timestampUrls = @(
+            "http://timestamp.digicert.com",
+            "http://timestamp.sectigo.com",
+            "http://tsa.starfieldtech.com"
+          )
+
+          $signed = $false
+          foreach ($tsUrl in $timestampUrls) {
+            try {
+              $sig = Set-AuthenticodeSignature -FilePath $exePath -Certificate $cert -TimestampServer $tsUrl -HashAlgorithm SHA256
+              if ($sig.SignerCertificate -ne $null -and $sig.TimeStamperCertificate -ne $null) {
+                Write-Host "Successfully signed with timestamp server: $tsUrl"
+                $signed = $true
+                break
+              } else {
+                Write-Warning "Signature status: $($sig.StatusMessage) with $tsUrl. Trying next timestamp server..."
+              }
+            } catch {
+              Write-Warning "Timestamping failed with $tsUrl : $_"
+            }
+          }
+
+          if (-not $signed) {
+            # Fallback without timestamp if timestamp servers are unavailable
+            Write-Warning "Falling back to signing without external timestamp server..."
+            $sig = Set-AuthenticodeSignature -FilePath $exePath -Certificate $cert -HashAlgorithm SHA256
+            if ($sig.SignerCertificate -ne $null) {
+              Write-Host "Signed successfully without timestamp."
+            }
+          }
+
+          # Verify signature
+          $sigVerify = Get-AuthenticodeSignature -FilePath $exePath
+          Write-Host "Signature check: $($sigVerify.Status) - $($sigVerify.SignerCertificate.Subject)"
+
+          # Cleanup temporary certificate files / store items
+          if ($tempPfx -and (Test-Path $tempPfx)) {
+            Remove-Item -Force $tempPfx
+          }
+          if (-not $env:WINDOWS_CERT_BASE64) {
+            # Clean up the generated self-signed private key from local runner store
+            Get-ChildItem "Cert:\CurrentUser\My\$($cert.Thumbprint)" -ErrorAction SilentlyContinue | Remove-Item
+          }
+
+      - name: Package Release ZIP & Generate Checksums
+        shell: pwsh
+        run: |
+          $version = "${{ steps.meta.outputs.version }}"
+          $artifactsDir = "artifacts"
+          $zipName = "DigitalClock-v$version-win-x64.zip"
+          $zipPath = "$artifactsDir\$zipName"
+          $publicCertPath = "$artifactsDir\DigitalClock-PublicCert.cer"
+
+          # Temporary staging folder containing only DigitalClock.exe and public cert
+          $stagingDir = "release_staging"
+          New-Item -ItemType Directory -Force -Path $stagingDir | Out-Null
+          Copy-Item "publish_output\DigitalClock.exe" -Destination $stagingDir\
+          if (Test-Path $publicCertPath) {
+            Copy-Item $publicCertPath -Destination $stagingDir\
+          }
+
+          Write-Host "Creating release archive: $zipPath"
+          Compress-Archive -Path "$stagingDir\*" -DestinationPath $zipPath -CompressionLevel Optimal -Force
+
+          # Calculate SHA-256 Checksums
+          Write-Host "Calculating SHA-256 checksums..."
+          $checksumFile = "$artifactsDir\SHA256SUMS.txt"
+          if (Test-Path $checksumFile) { Remove-Item $checksumFile }
+
+          $filesToCheck = Get-ChildItem -Path $artifactsDir -File | Where-Object { $_.Name -ne "SHA256SUMS.txt" }
+          foreach ($f in $filesToCheck) {
+            $hash = (Get-FileHash -Path $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($f.Name)" | Out-File -FilePath $checksumFile -Append -Encoding ascii
+            Write-Host "$hash  $($f.Name)"
+          }
+
+          # Cleanup staging folder
+          Remove-Item -Recurse -Force $stagingDir
+
+      - name: Attest Build Provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            artifacts/DigitalClock-*.zip
+            artifacts/DigitalClock-PublicCert.cer
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: DigitalClock ${{ steps.meta.outputs.version }}
+          body: ${{ steps.meta.outputs.notes }}
+          files: |
+            artifacts/DigitalClock-*.zip
+            artifacts/DigitalClock-PublicCert.cer
+            artifacts/SHA256SUMS.txt
+          draft: false
+          prerelease: false

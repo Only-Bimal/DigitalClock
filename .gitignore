@@ -1,4 +1,7 @@
 /bin
 /obj
-/.vs/DigitalClock
+/.vs/
+/artifacts/
+/publish_output/
+*.pfx
 1 Implementation Plan.md

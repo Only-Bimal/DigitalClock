@@ -382,6 +382,57 @@ Output binary location:
 
 ---
 
+### Automated Release Workflow & Packaging
+
+Project includes both an automated **GitHub Actions CI/CD workflow** and a **local PowerShell automation script** to build, sign, package, and publish releases.
+
+#### 1. Local Release Script (`build-release.ps1`)
+To build, sign, and package a release locally on Windows:
+```pwsh
+# Build, sign (self-signed CN="Digital Clock (Bimal)"), package ZIP, and generate SHA-256 checksums
+.\build-release.ps1
+
+# Build and automatically tag and push to GitHub (triggers GitHub Actions release)
+.\build-release.ps1 -CreateTag -PushTag
+
+# Or sign with a custom PFX certificate
+.\build-release.ps1 -CertPath "C:\path\to\cert.pfx" -CertPassword "password"
+```
+
+All release artifacts are generated in the `artifacts\` directory:
+* `DigitalClock-v<version>-win-x64.zip` (ZIP containing `DigitalClock.exe` and `DigitalClock-PublicCert.cer`)
+* `DigitalClock-PublicCert.cer` (standalone public certificate for optional user installation)
+* `SHA256SUMS.txt` (SHA-256 verification hashes)
+
+#### 2. GitHub Actions CI/CD Workflow (`.github/workflows/release.yml`)
+The GitHub Actions workflow triggers automatically when a release tag is pushed:
+```pwsh
+git tag v2.6.0
+git push origin v2.6.0
+```
+It can also be manually dispatched via the **Actions** tab in GitHub.
+
+**Workflow Highlights:**
+* **Size**: Packages a single-file binary.
+* **Dual Signing Security**:
+  * **Authenticode Signature**: Signed with RFC 3161 timestamping. If custom secrets (`WINDOWS_CERT_BASE64` and `WINDOWS_CERT_PASSWORD`) are configured in GitHub repository secrets, it uses your certificate; otherwise, it automatically creates a self-signed certificate.
+  * **GitHub Artifact Attestation**: Attaches cryptographically verifiable Sigstore build provenance (`actions/attest-build-provenance`).
+* **Automated GitHub Release**: Automatically parses `CHANGELOG.md` to extract the corresponding version notes and publishes the release assets.
+
+#### 3. Verifying Authenticity & Trusting Self-Signed Certificates
+* **Verify GitHub Build Provenance**:
+  ```pwsh
+  gh attestation verify DigitalClock-v2.6.0-win-x64.zip --owner Only-Bimal
+  ```
+* **Install Public Certificate (Optional)**:
+  To eliminate the Windows SmartScreen unknown publisher prompt for self-signed builds, you can optionally install `DigitalClock-PublicCert.cer`:
+  1. Double-click `DigitalClock-PublicCert.cer`.
+  2. Click **Install Certificate...** &rarr; Select **Current User** (or Local Machine).
+  3. Choose **Place all certificates in the following store** &rarr; **Browse...** &rarr; Select **Trusted Root Certification Authorities**.
+  4. Complete the wizard. `DigitalClock.exe` will now be recognized as trusted on that PC.
+
+---
+
 ### Contributing Guidelines
 
 Contributions, bug reports, and suggestions are welcome!
