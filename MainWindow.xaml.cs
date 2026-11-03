@@ -883,6 +883,16 @@ namespace DigitalClock
 
         private void Window_Closing(object sender, CancelEventArgs e)
         {
+            if (_activeSettingsWindow != null && _activeSettingsWindow.IsLoaded)
+            {
+                bool canClose = _activeSettingsWindow.HandleMainWindowClosing();
+                if (!canClose)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+            }
+
             if (WindowState == WindowState.Normal)
             {
                 SettingsManager.Current.Settings.Placement.Left = Left;

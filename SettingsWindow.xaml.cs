@@ -12,6 +12,8 @@ namespace DigitalClock
         private readonly AppSettings _originalSettings;
         private readonly AppSettings _tempSettings;
         private bool _isInitializing = true;
+        private bool _hasSnappedWindow = false;
+        private bool _isSaved = false;
         private readonly MainWindow _mainWindow;
 
         public SettingsWindow(MainWindow mainWindow)
@@ -21,6 +23,8 @@ namespace DigitalClock
             _tempSettings = SettingsManager.Current.Settings.Clone();
 
             InitializeComponent();
+            SettingsTabControl.SelectedIndex = 0;
+            NavGeneral.IsChecked = true;
             PopulateControls();
             _isInitializing = false;
         }
@@ -32,6 +36,7 @@ namespace DigitalClock
             ChkShowSeconds.IsChecked = _tempSettings.General.ShowSeconds;
             ChkBlinkColon.IsChecked = _tempSettings.General.BlinkColon;
             ChkShowDate.IsChecked = _tempSettings.General.ShowDate;
+            CmbDateFormat.IsEnabled = _tempSettings.General.ShowDate;
 
             // Date format combobox selection
             SelectDateFormat(_tempSettings.General.DateFormat);
@@ -108,20 +113,82 @@ namespace DigitalClock
             ChkShowTrayIcon.IsChecked = _tempSettings.Behavior.ShowTrayIcon;
             UpdateSavedSizeStatus();
 
-            // About & Reset
+            // Reset & Storage
+            TxtStorageMode.Text = SettingsManager.Current.IsPortableMode
+                ? "Portable Mode (beside application executable)"
+                : "Standard Mode (%AppData% folder)";
+            TxtStorageMode.Foreground = SettingsManager.Current.IsPortableMode
+                ? new SolidColorBrush(Color.FromRgb(0, 140, 60))
+                : new SolidColorBrush(Color.FromRgb(0, 120, 215));
+
+            TxtConfigPath.Text = SettingsManager.Current.ConfigFilePath;
+
+            // About
             var appVersion = typeof(SettingsWindow).Assembly.GetName().Version;
             TxtAppTitle.Text = appVersion != null
                 ? $"Digital Clock v{appVersion.Major}.{appVersion.Minor}"
                 : "Digital Clock v2.6";
 
-            TxtStorageMode.Text = SettingsManager.Current.IsPortableMode
-                ? "Portable Mode (beside application executable)"
-                : "Standard Mode (%AppData% folder)";
-            TxtStorageMode.Foreground = SettingsManager.Current.IsPortableMode
-                ? new SolidColorBrush(Color.FromRgb(0, 230, 118))
-                : new SolidColorBrush(Color.FromRgb(64, 196, 255));
+            // Application Icon
+            LoadAppIcons();
+        }
 
-            TxtConfigPath.Text = SettingsManager.Current.ConfigFilePath;
+        private void LoadAppIcons()
+        {
+            try
+            {
+                var iconSource = GetAppIconImageSource();
+                if (iconSource != null)
+                {
+                    Icon = iconSource;
+                    if (ImgHeaderIcon != null) ImgHeaderIcon.Source = iconSource;
+                    if (ImgAboutIcon != null) ImgAboutIcon.Source = iconSource;
+                }
+            }
+            catch { }
+        }
+
+        private static ImageSource? GetAppIconImageSource()
+        {
+            try
+            {
+                var uri = new Uri("pack://application:,,,/DigitalClock;component/accessories-clock.ico", UriKind.Absolute);
+                var streamInfo = Application.GetResourceStream(uri);
+                if (streamInfo != null)
+                {
+                    using var stream = streamInfo.Stream;
+                    var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(stream, System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+                    return decoder.Frames.Count > 0 ? decoder.Frames[0] : null;
+                }
+            }
+            catch { }
+
+            try
+            {
+                var uri = new Uri("pack://application:,,,/accessories-clock.ico", UriKind.Absolute);
+                var streamInfo = Application.GetResourceStream(uri);
+                if (streamInfo != null)
+                {
+                    using var stream = streamInfo.Stream;
+                    var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(stream, System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+                    return decoder.Frames.Count > 0 ? decoder.Frames[0] : null;
+                }
+            }
+            catch { }
+
+            try
+            {
+                string directIco = Path.Combine(AppContext.BaseDirectory, "accessories-clock.ico");
+                if (File.Exists(directIco))
+                {
+                    using var stream = File.OpenRead(directIco);
+                    var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(stream, System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+                    return decoder.Frames.Count > 0 ? decoder.Frames[0] : null;
+                }
+            }
+            catch { }
+
+            return null;
         }
 
         private void PopulateFonts()
@@ -141,12 +208,14 @@ namespace DigitalClock
             CmbFontFamily.SelectedIndex = selectedIndex;
         }
 
-        private void SelectDateFormat(string format)
+        private void SelectDateFormat(string? format)
         {
+            if (CmbDateFormat == null) return;
+            string target = string.IsNullOrEmpty(format) ? "dddd" : format;
             for (int i = 0; i < CmbDateFormat.Items.Count; i++)
             {
                 if (CmbDateFormat.Items[i] is ComboBoxItem item &&
-                    item.Content.ToString()!.StartsWith(format))
+                    item.Content?.ToString()?.StartsWith(target) == true)
                 {
                     CmbDateFormat.SelectedIndex = i;
                     return;
@@ -203,20 +272,29 @@ namespace DigitalClock
 
             // Live Preview on MainWindow
             SettingsManager.Current.NotifySettingsChanged();
-            _mainWindow.ApplySettings(_tempSettings);
+            if (_mainWindow != null && _mainWindow.IsLoaded)
+            {
+                _mainWindow.ApplySettings(_tempSettings);
+            }
         }
 
         private void NavButton_Click(object sender, RoutedEventArgs e)
         {
+            if (SettingsTabControl == null) return;
+
             if (sender == NavGeneral) SettingsTabControl.SelectedIndex = 0;
             else if (sender == NavAppearance) SettingsTabControl.SelectedIndex = 1;
             else if (sender == NavBehavior) SettingsTabControl.SelectedIndex = 2;
-            else if (sender == NavAbout) SettingsTabControl.SelectedIndex = 3;
+            else if (sender == NavReset) SettingsTabControl.SelectedIndex = 3;
+            else if (sender == NavAbout) SettingsTabControl.SelectedIndex = 4;
         }
 
         private void OnShowDateToggled(object sender, RoutedEventArgs e)
         {
-            CmbDateFormat.IsEnabled = ChkShowDate.IsChecked == true;
+            if (CmbDateFormat != null)
+            {
+                CmbDateFormat.IsEnabled = ChkShowDate?.IsChecked == true;
+            }
             OnSettingChanged(sender, e);
         }
 
@@ -261,13 +339,41 @@ namespace DigitalClock
         }
 
         // Snap Position Handlers
-        private void SnapTopLeft_Click(object sender, RoutedEventArgs e) => _mainWindow.SnapTo(SnapPosition.TopLeft);
-        private void SnapTopCenter_Click(object sender, RoutedEventArgs e) => _mainWindow.SnapTo(SnapPosition.TopCenter);
-        private void SnapTopRight_Click(object sender, RoutedEventArgs e) => _mainWindow.SnapTo(SnapPosition.TopRight);
-        private void SnapCenter_Click(object sender, RoutedEventArgs e) => _mainWindow.SnapTo(SnapPosition.Center);
-        private void SnapBottomLeft_Click(object sender, RoutedEventArgs e) => _mainWindow.SnapTo(SnapPosition.BottomLeft);
-        private void SnapBottomCenter_Click(object sender, RoutedEventArgs e) => _mainWindow.SnapTo(SnapPosition.BottomCenter);
-        private void SnapBottomRight_Click(object sender, RoutedEventArgs e) => _mainWindow.SnapTo(SnapPosition.BottomRight);
+        private void SnapTopLeft_Click(object sender, RoutedEventArgs e)
+        {
+            _hasSnappedWindow = true;
+            if (_mainWindow != null && _mainWindow.IsLoaded) _mainWindow.SnapTo(SnapPosition.TopLeft);
+        }
+        private void SnapTopCenter_Click(object sender, RoutedEventArgs e)
+        {
+            _hasSnappedWindow = true;
+            if (_mainWindow != null && _mainWindow.IsLoaded) _mainWindow.SnapTo(SnapPosition.TopCenter);
+        }
+        private void SnapTopRight_Click(object sender, RoutedEventArgs e)
+        {
+            _hasSnappedWindow = true;
+            if (_mainWindow != null && _mainWindow.IsLoaded) _mainWindow.SnapTo(SnapPosition.TopRight);
+        }
+        private void SnapCenter_Click(object sender, RoutedEventArgs e)
+        {
+            _hasSnappedWindow = true;
+            if (_mainWindow != null && _mainWindow.IsLoaded) _mainWindow.SnapTo(SnapPosition.Center);
+        }
+        private void SnapBottomLeft_Click(object sender, RoutedEventArgs e)
+        {
+            _hasSnappedWindow = true;
+            if (_mainWindow != null && _mainWindow.IsLoaded) _mainWindow.SnapTo(SnapPosition.BottomLeft);
+        }
+        private void SnapBottomCenter_Click(object sender, RoutedEventArgs e)
+        {
+            _hasSnappedWindow = true;
+            if (_mainWindow != null && _mainWindow.IsLoaded) _mainWindow.SnapTo(SnapPosition.BottomCenter);
+        }
+        private void SnapBottomRight_Click(object sender, RoutedEventArgs e)
+        {
+            _hasSnappedWindow = true;
+            if (_mainWindow != null && _mainWindow.IsLoaded) _mainWindow.SnapTo(SnapPosition.BottomRight);
+        }
 
         private void OpenConfigFolder_Click(object sender, RoutedEventArgs e)
         {
@@ -286,6 +392,65 @@ namespace DigitalClock
             catch (Exception ex)
             {
                 MessageBox.Show($"Unable to open folder: {ex.Message}", "DigitalClock", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void BackupSettings_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var sfd = new Microsoft.Win32.SaveFileDialog
+                {
+                    Title = "Backup Settings File",
+                    Filter = "JSON Configuration File (*.json)|*.json|All Files (*.*)|*.*",
+                    DefaultExt = ".json",
+                    FileName = $"DigitalClock-Settings-Backup-{DateTime.Now:yyyyMMdd-HHmmss}.json"
+                };
+
+                if (sfd.ShowDialog(this) == true)
+                {
+                    // Update placement in _tempSettings from current window
+                    try
+                    {
+                        if (_mainWindow != null && _mainWindow.IsLoaded)
+                        {
+                            _tempSettings.Placement.Left = _mainWindow.Left;
+                            _tempSettings.Placement.Top = _mainWindow.Top;
+
+                            if (_mainWindow.PlacementWidth.HasValue)
+                            {
+                                _tempSettings.Placement.Width = _mainWindow.ActualWidth;
+                                _tempSettings.Placement.Height = _mainWindow.ActualHeight;
+                            }
+                            else
+                            {
+                                _tempSettings.Placement.Width = null;
+                                _tempSettings.Placement.Height = null;
+                            }
+                        }
+                    }
+                    catch { }
+
+                    var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
+                    string json = System.Text.Json.JsonSerializer.Serialize(_tempSettings, options);
+                    File.WriteAllText(sfd.FileName, json);
+
+                    MessageBox.Show(
+                        this,
+                        $"Settings successfully backed up to:\n{sfd.FileName}",
+                        "Backup Settings",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    this,
+                    $"Failed to backup settings: {ex.Message}",
+                    "Backup Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
 
@@ -310,13 +475,87 @@ namespace DigitalClock
             UpdateSavedSizeStatus();
 
             // Immediate live preview on MainWindow: sizes border-to-border on the current screen
-            _mainWindow.ResetSizeToScreenDefault();
+            if (_mainWindow != null && _mainWindow.IsLoaded)
+            {
+                _mainWindow.ResetSizeToScreenDefault();
+            }
         }
 
+        // Granular Reset: Appearance & Styling
+        private void ResetAppearance_Click(object sender, RoutedEventArgs e)
+        {
+            var defaultAppearance = new AppearanceSettings();
+            _tempSettings.Appearance = defaultAppearance;
+
+            _isInitializing = true;
+            CmbBackgroundStyle.SelectedIndex = (int)_tempSettings.Appearance.BackgroundStyle;
+            if (_tempSettings.Appearance.ColorMode == ColorSelectionMode.WindowsAccent)
+            {
+                RbColorAccent.IsChecked = true;
+                PanelCustomColors.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                RbColorCustom.IsChecked = true;
+                PanelCustomColors.Visibility = Visibility.Visible;
+            }
+
+            TxtHexColor.Text = _tempSettings.Appearance.CustomHexColor;
+            UpdateColorPreview(_tempSettings.Appearance.CustomHexColor);
+            PopulateFonts();
+            SliderOpacity.Value = _tempSettings.Appearance.Opacity;
+            LblOpacity.Text = $"{(int)(SliderOpacity.Value * 100)}%";
+            ChkDropShadow.IsChecked = _tempSettings.Appearance.EnableDropShadow;
+            _isInitializing = false;
+
+            if (_mainWindow != null && _mainWindow.IsLoaded)
+            {
+                _mainWindow.ApplySettings(_tempSettings);
+            }
+        }
+
+        // Granular Reset: Window Size & Placement
+        private void ResetSizeAndPosition_Click(object sender, RoutedEventArgs e)
+        {
+            _tempSettings.Placement.Width = null;
+            _tempSettings.Placement.Height = null;
+            _tempSettings.Placement.Left = null;
+            _tempSettings.Placement.Top = null;
+            _tempSettings.Placement.TargetScreenIndex = -1;
+            UpdateSavedSizeStatus();
+
+            if (_mainWindow != null && _mainWindow.IsLoaded)
+            {
+                _mainWindow.ResetSizeToScreenDefault();
+            }
+        }
+
+        // Granular Reset: General & Time Display
+        private void ResetGeneral_Click(object sender, RoutedEventArgs e)
+        {
+            var defaultGeneral = new GeneralSettings();
+            _tempSettings.General = defaultGeneral;
+
+            _isInitializing = true;
+            Chk24Hour.IsChecked = _tempSettings.General.Is24HourFormat;
+            ChkShowSeconds.IsChecked = _tempSettings.General.ShowSeconds;
+            ChkBlinkColon.IsChecked = _tempSettings.General.BlinkColon;
+            ChkShowDate.IsChecked = _tempSettings.General.ShowDate;
+            SelectDateFormat(_tempSettings.General.DateFormat);
+            CmbDateFormat.IsEnabled = _tempSettings.General.ShowDate;
+            _isInitializing = false;
+
+            if (_mainWindow != null && _mainWindow.IsLoaded)
+            {
+                _mainWindow.ApplySettings(_tempSettings);
+            }
+        }
+
+        // Factory Reset: All Settings
         private void ResetSettings_Click(object sender, RoutedEventArgs e)
         {
             var result = MessageBox.Show(
-                "Are you sure you want to restore all settings back to factory defaults?\nYour custom styles and positions will be reset.",
+                "Are you sure you want to restore all settings back to factory defaults?\nYour custom styles, formats, and positions will be reset.",
                 "Reset Settings",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
@@ -333,42 +572,153 @@ namespace DigitalClock
                 PopulateControls();
                 _isInitializing = false;
 
-                _mainWindow.ApplySettings(SettingsManager.Current.Settings);
-                _mainWindow.ResetSizeToScreenDefault();
+                if (_mainWindow != null && _mainWindow.IsLoaded)
+                {
+                    _mainWindow.ApplySettings(SettingsManager.Current.Settings);
+                    _mainWindow.ResetSizeToScreenDefault();
+                }
             }
         }
 
-        private bool _isSaved = false;
+        private void BtnGitHub_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://github.com/Only-Bimal/DigitalClock",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Unable to open GitHub repository: {ex.Message}", "Digital Clock", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
 
-        private void Save_Click(object sender, RoutedEventArgs e)
+        public bool HasUnsavedChanges()
+        {
+            if (_isSaved) return false;
+
+            if (_hasSnappedWindow)
+            {
+                try
+                {
+                    if (_mainWindow != null && _mainWindow.IsLoaded)
+                    {
+                        if (_mainWindow.Left != _originalSettings.Placement.Left ||
+                            _mainWindow.Top != _originalSettings.Placement.Top)
+                        {
+                            return true;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            string origJson = System.Text.Json.JsonSerializer.Serialize(_originalSettings);
+            string tempJson = System.Text.Json.JsonSerializer.Serialize(_tempSettings);
+            return !string.Equals(origJson, tempJson, StringComparison.Ordinal);
+        }
+
+        public bool HandleMainWindowClosing()
+        {
+            if (!HasUnsavedChanges())
+            {
+                _isSaved = true;
+                Close();
+                return true;
+            }
+
+            var result = MessageBox.Show(
+                this,
+                "You have unsaved changes in Settings.\n\nDo you want to save your changes before closing?",
+                "Digital Clock Settings",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                SaveInternal();
+                return true;
+            }
+            else if (result == MessageBoxResult.No)
+            {
+                _isSaved = true;
+                try
+                {
+                    if (_mainWindow != null && _mainWindow.IsLoaded)
+                    {
+                        _mainWindow.RestorePlacement(_originalSettings.Placement);
+                        _mainWindow.ApplySettings(_originalSettings);
+                    }
+                }
+                catch { }
+                Close();
+                return true;
+            }
+            else // MessageBoxResult.Cancel
+            {
+                return false;
+            }
+        }
+
+        private void SaveInternal()
         {
             _isSaved = true;
 
-            // Update placement from current window position
-            _tempSettings.Placement.Left = _mainWindow.Left;
-            _tempSettings.Placement.Top = _mainWindow.Top;
+            try
+            {
+                if (_mainWindow != null && _mainWindow.IsLoaded)
+                {
+                    _tempSettings.Placement.Left = _mainWindow.Left;
+                    _tempSettings.Placement.Top = _mainWindow.Top;
 
-            if (_mainWindow.PlacementWidth.HasValue)
-            {
-                _tempSettings.Placement.Width = _mainWindow.ActualWidth;
-                _tempSettings.Placement.Height = _mainWindow.ActualHeight;
+                    if (_mainWindow.PlacementWidth.HasValue)
+                    {
+                        _tempSettings.Placement.Width = _mainWindow.ActualWidth;
+                        _tempSettings.Placement.Height = _mainWindow.ActualHeight;
+                    }
+                    else
+                    {
+                        _tempSettings.Placement.Width = null;
+                        _tempSettings.Placement.Height = null;
+                    }
+                }
             }
-            else
-            {
-                _tempSettings.Placement.Width = null;
-                _tempSettings.Placement.Height = null;
-            }
+            catch { }
 
             SettingsManager.Current.UpdateSettings(_tempSettings);
-            _mainWindow.ApplySettings(_tempSettings);
+
+            try
+            {
+                if (_mainWindow != null && _mainWindow.IsLoaded)
+                {
+                    _mainWindow.ApplySettings(_tempSettings);
+                }
+            }
+            catch { }
+
             Close();
+        }
+
+        private void Save_Click(object sender, RoutedEventArgs e)
+        {
+            SaveInternal();
         }
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {
-            // Revert live preview back to original placement and settings
-            _mainWindow.RestorePlacement(_originalSettings.Placement);
-            _mainWindow.ApplySettings(_originalSettings);
+            _isSaved = true;
+            try
+            {
+                if (_mainWindow != null && _mainWindow.IsLoaded)
+                {
+                    _mainWindow.RestorePlacement(_originalSettings.Placement);
+                    _mainWindow.ApplySettings(_originalSettings);
+                }
+            }
+            catch { }
             Close();
         }
 
@@ -377,8 +727,15 @@ namespace DigitalClock
             base.OnClosed(e);
             if (!_isSaved)
             {
-                _mainWindow.RestorePlacement(_originalSettings.Placement);
-                _mainWindow.ApplySettings(_originalSettings);
+                try
+                {
+                    if (_mainWindow != null && _mainWindow.IsLoaded)
+                    {
+                        _mainWindow.RestorePlacement(_originalSettings.Placement);
+                        _mainWindow.ApplySettings(_originalSettings);
+                    }
+                }
+                catch { }
             }
         }
     }
