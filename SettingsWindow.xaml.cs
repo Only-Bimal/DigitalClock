@@ -91,6 +91,10 @@ namespace DigitalClock
                 {
                     if (s is Button b && b.Tag is string clickedHex)
                     {
+                        RbColorCustom.IsChecked = true;
+                        RbColorAccent.IsChecked = false;
+                        _tempSettings.Appearance.ColorMode = ColorSelectionMode.Custom;
+                        PanelCustomColors.Visibility = Visibility.Visible;
                         TxtHexColor.Text = clickedHex;
                     }
                 };
@@ -126,8 +130,10 @@ namespace DigitalClock
             // About
             var appVersion = typeof(SettingsWindow).Assembly.GetName().Version;
             TxtAppTitle.Text = appVersion != null
-                ? $"Digital Clock v{appVersion.Major}.{appVersion.Minor}"
-                : "Digital Clock v2.6";
+                ? (appVersion.Build > 0
+                    ? $"Digital Clock v{appVersion.Major}.{appVersion.Minor}.{appVersion.Build}"
+                    : $"Digital Clock v{appVersion.Major}.{appVersion.Minor}")
+                : "Digital Clock v2.7.1";
 
             // Application Icon
             LoadAppIcons();
@@ -137,54 +143,99 @@ namespace DigitalClock
         {
             try
             {
-                var iconSource = GetAppIconImageSource();
-                if (iconSource != null)
+                var headerIcon = GetAppIconImageSource(32);
+                var aboutIcon = GetAppIconImageSource(48) ?? headerIcon;
+
+                if (headerIcon != null)
                 {
-                    Icon = iconSource;
-                    if (ImgHeaderIcon != null) ImgHeaderIcon.Source = iconSource;
-                    if (ImgAboutIcon != null) ImgAboutIcon.Source = iconSource;
+                    Icon = headerIcon;
+                    if (ImgHeaderIcon != null) ImgHeaderIcon.Source = headerIcon;
+                }
+
+                if (aboutIcon != null && ImgAboutIcon != null)
+                {
+                    ImgAboutIcon.Source = aboutIcon;
                 }
             }
             catch { }
         }
 
-        private static ImageSource? GetAppIconImageSource()
+        private static ImageSource? GetAppIconImageSource(int targetSize = 48)
         {
+            // 1. Check for accessories-clock.ico on disk
             try
             {
-                var uri = new Uri("pack://application:,,,/DigitalClock;component/accessories-clock.ico", UriKind.Absolute);
-                var streamInfo = Application.GetResourceStream(uri);
-                if (streamInfo != null)
+                string[] candidates =
+                [
+                    Path.Combine(AppContext.BaseDirectory, "accessories-clock.ico"),
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "accessories-clock.ico"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "accessories-clock.ico")
+                ];
+
+                foreach (var path in candidates)
                 {
-                    using var stream = streamInfo.Stream;
-                    var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(stream, System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
-                    return decoder.Frames.Count > 0 ? decoder.Frames[0] : null;
+                    if (File.Exists(path))
+                    {
+                        using var stream = File.OpenRead(path);
+                        var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(
+                            stream,
+                            System.Windows.Media.Imaging.BitmapCreateOptions.None,
+                            System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+
+                        if (decoder.Frames.Count > 0)
+                        {
+                            System.Windows.Media.Imaging.BitmapFrame best = decoder.Frames[0];
+                            int minDiff = int.MaxValue;
+                            foreach (var frame in decoder.Frames)
+                            {
+                                int diff = Math.Abs(frame.PixelWidth - targetSize);
+                                if (diff < minDiff)
+                                {
+                                    minDiff = diff;
+                                    best = frame;
+                                }
+                            }
+                            best.Freeze();
+                            return best;
+                        }
+                    }
                 }
             }
             catch { }
 
+            // 2. Extract embedded application icon directly from the running executable (.exe)
             try
             {
-                var uri = new Uri("pack://application:,,,/accessories-clock.ico", UriKind.Absolute);
-                var streamInfo = Application.GetResourceStream(uri);
-                if (streamInfo != null)
+                string? exePath = Environment.ProcessPath
+                    ?? Process.GetCurrentProcess().MainModule?.FileName
+                    ?? Path.Combine(AppContext.BaseDirectory, "DigitalClock.exe");
+
+                if (!string.IsNullOrEmpty(exePath) && File.Exists(exePath))
                 {
-                    using var stream = streamInfo.Stream;
-                    var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(stream, System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
-                    return decoder.Frames.Count > 0 ? decoder.Frames[0] : null;
+                    using var icon = System.Drawing.Icon.ExtractAssociatedIcon(exePath);
+                    if (icon != null)
+                    {
+                        var bs = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(
+                            icon.Handle,
+                            Int32Rect.Empty,
+                            System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+                        bs.Freeze();
+                        return bs;
+                    }
                 }
             }
             catch { }
 
+            // 3. Fallback to System Application Icon
             try
             {
-                string directIco = Path.Combine(AppContext.BaseDirectory, "accessories-clock.ico");
-                if (File.Exists(directIco))
-                {
-                    using var stream = File.OpenRead(directIco);
-                    var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(stream, System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
-                    return decoder.Frames.Count > 0 ? decoder.Frames[0] : null;
-                }
+                using var sysIcon = System.Drawing.SystemIcons.Application;
+                var bs = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(
+                    sysIcon.Handle,
+                    Int32Rect.Empty,
+                    System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+                bs.Freeze();
+                return bs;
             }
             catch { }
 
@@ -241,15 +292,32 @@ namespace DigitalClock
             }
 
             // Color Mode
-            if (RbColorAccent.IsChecked == true)
+            if (sender == RbColorAccent || sender == RbColorCustom)
             {
-                _tempSettings.Appearance.ColorMode = ColorSelectionMode.WindowsAccent;
-                PanelCustomColors.Visibility = Visibility.Collapsed;
+                if (RbColorAccent.IsChecked == true)
+                {
+                    _tempSettings.Appearance.ColorMode = ColorSelectionMode.WindowsAccent;
+                    PanelCustomColors.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    _tempSettings.Appearance.ColorMode = ColorSelectionMode.Custom;
+                    PanelCustomColors.Visibility = Visibility.Visible;
+                }
             }
             else
             {
-                _tempSettings.Appearance.ColorMode = ColorSelectionMode.Custom;
-                PanelCustomColors.Visibility = Visibility.Visible;
+                // Preserve existing ColorMode and keep UI in sync
+                if (_tempSettings.Appearance.ColorMode == ColorSelectionMode.WindowsAccent)
+                {
+                    if (RbColorAccent.IsChecked != true) RbColorAccent.IsChecked = true;
+                    PanelCustomColors.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    if (RbColorCustom.IsChecked != true) RbColorCustom.IsChecked = true;
+                    PanelCustomColors.Visibility = Visibility.Visible;
+                }
             }
 
             _tempSettings.Appearance.CustomHexColor = TxtHexColor.Text.Trim();
@@ -323,6 +391,15 @@ namespace DigitalClock
 
             string hex = TxtHexColor.Text.Trim();
             UpdateColorPreview(hex);
+
+            if (TxtHexColor.IsFocused && RbColorCustom.IsChecked != true)
+            {
+                RbColorCustom.IsChecked = true;
+                RbColorAccent.IsChecked = false;
+                _tempSettings.Appearance.ColorMode = ColorSelectionMode.Custom;
+                PanelCustomColors.Visibility = Visibility.Visible;
+            }
+
             OnSettingChanged(sender, e);
         }
 

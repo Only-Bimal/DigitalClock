@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file.
 
 ## Releases
+### v2.7.1
+* **Dedicated Reset & About Pages**: Separated "About & Reset" into two distinct tabs ("Reset" and "About") with dedicated controls and layout.
+* **Backup Settings**: Added a "Backup Settings..." option on the Reset page to export configuration to a JSON backup file.
+* **Enhanced Settings Dialog UX**: Increased dialog height for comfort, defaulted to General tab, and synchronized closing with the main clock (with prompt if unsaved changes exist).
+* **Click-Through Mode Color Preservation**: Fixed issue where toggling Click-Through mode in Dark Frosted Pill style reset the clock text color to accent color.
+* **Adaptive Luminance Boost & 360° Contrast Halo**: Enhanced text readability across any desktop wallpaper with dynamic accent lightness boost and a 360° contrast halo effect.
+* **Embedded & Deployable Application Icons**: Deployed multi-resolution application icons with fallbacks ensuring window and header icons are always displayed.
+
 ### v2.6
 * **Modernized to .NET 10** with SDK-style project and high-performance WPF.
 * **Full Settings Dialog**: Comprehensive configuration dialog with General, Appearance, Behavior, and About/Reset tabs.

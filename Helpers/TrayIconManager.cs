@@ -105,8 +105,9 @@ namespace DigitalClock
 
             _lockPositionItem = new ToolStripMenuItem("🔒 Lock Position", null, (sender, e) =>
             {
-                var settings = SettingsManager.Current.Settings;
+                var settings = _mainWindow.EffectiveSettings;
                 settings.Behavior.LockPosition = !settings.Behavior.LockPosition;
+                SettingsManager.Current.Settings.Behavior.LockPosition = settings.Behavior.LockPosition;
                 SettingsManager.Current.Save();
                 _mainWindow.ApplySettings(settings);
             });
@@ -114,8 +115,9 @@ namespace DigitalClock
 
             _clickThroughItem = new ToolStripMenuItem("👻 Click-Through Mode", null, (sender, e) =>
             {
-                var settings = SettingsManager.Current.Settings;
+                var settings = _mainWindow.EffectiveSettings;
                 settings.Behavior.ClickThrough = !settings.Behavior.ClickThrough;
+                SettingsManager.Current.Settings.Behavior.ClickThrough = settings.Behavior.ClickThrough;
                 SettingsManager.Current.Save();
                 _mainWindow.ApplySettings(settings);
             });

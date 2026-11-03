@@ -12,10 +12,10 @@
     <RootNamespace>DigitalClock</RootNamespace>
     <AssemblyName>DigitalClock</AssemblyName>
     <StartupObject>DigitalClock.App</StartupObject>
-    <Version>2.6.0</Version>
-    <AssemblyVersion>2.6.0.0</AssemblyVersion>
-    <FileVersion>2.6.0.0</FileVersion>
-    <InformationalVersion>2.6.0</InformationalVersion>
+    <Version>2.7.1</Version>
+    <AssemblyVersion>2.7.1.0</AssemblyVersion>
+    <FileVersion>2.7.1.0</FileVersion>
+    <InformationalVersion>2.7.1</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>Digital Clock</Product>
     <Title>Digital Clock</Title>
@@ -25,12 +25,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Resource Include="accessories-clock.ico" />
+    <Content Include="accessories-clock.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Resource Include="Resources\Fonts\*.ttf" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="accessories-clock.ico" />
   </ItemGroup>
 
   <ItemGroup>

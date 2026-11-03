@@ -87,16 +87,32 @@ namespace DigitalClock
             return 0.2126 * r + 0.7152 * g + 0.0722 * b;
         }
 
-        public static Color EnsureVisibleOnDark(Color color, double minLuminance = 0.45)
+        public static Color EnsureVisibleOnDark(Color color, double minLuminance = 0.18)
         {
-            double lum = GetRelativeLuminance(color);
-            if (lum >= minLuminance) return color;
-
             RgbToHsl(color, out double h, out double s, out double l);
-            // Boost lightness while keeping hue vibrant
-            l = Math.Max(l, 0.72);
-            s = Math.Max(s, 0.60);
+            if (l >= 0.38) return color;
+
+            // Boost lightness while keeping hue vibrant without bleaching into pastel
+            l = 0.52;
+            s = Math.Max(s, 0.70);
             return HslToRgb(h, s, l);
+        }
+
+        public static Color AdaptAccentColorForVisibility(Color color)
+        {
+            RgbToHsl(color, out double h, out double s, out double l);
+
+            // If the Windows accent color is too dark to be clearly visible against desktop backgrounds
+            // or frosted pill backplates (e.g. dark navy blue #00406B), boost its lightness to a vibrant,
+            // luminous range while preserving its rich hue and saturation.
+            if (l < 0.48)
+            {
+                l = 0.54;
+                s = Math.Max(s, 0.75);
+                return HslToRgb(h, s, l);
+            }
+
+            return color;
         }
 
         public static void RgbToHsl(Color c, out double h, out double s, out double l)

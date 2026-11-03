@@ -69,7 +69,7 @@
 							   TextAlignment="Center"
 							   Typography.NumeralAlignment="Tabular" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center">
 						<TextBlock.Effect>
-							<DropShadowEffect x:Name="TimeShadowEffect" BlurRadius="9" ShadowDepth="4" Direction="315" Color="#000000" Opacity="0.70"/>
+							<DropShadowEffect x:Name="TimeShadowEffect" BlurRadius="10" ShadowDepth="1.5" Direction="315" Color="#000000" Opacity="0.85"/>
 						</TextBlock.Effect>
 					</TextBlock>
 
@@ -85,7 +85,7 @@
 							   VerticalAlignment="Center"
 							   TextAlignment="Center">
 						<TextBlock.Effect>
-							<DropShadowEffect x:Name="DateShadowEffect" BlurRadius="9" ShadowDepth="4" Direction="315" Color="#000000" Opacity="0.70"/>
+							<DropShadowEffect x:Name="DateShadowEffect" BlurRadius="8" ShadowDepth="1.5" Direction="315" Color="#000000" Opacity="0.85"/>
 						</TextBlock.Effect>
 					</TextBlock>
 				</StackPanel>

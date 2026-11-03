@@ -8,7 +8,7 @@ A modern, highly customizable desktop clock application built with **.NET 10** a
 [![Framework](https://img.shields.io/badge/.NET-10.0-512BD4.svg)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/Language-C%23%2013-239120.svg)](https://docs.microsoft.com/dotnet/csharp/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.txt)
-[![Version](https://img.shields.io/badge/Version-2.6.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-2.7.1-green.svg)](CHANGELOG.md)
 
 ---
 
@@ -407,8 +407,8 @@ All release artifacts are generated in the `artifacts\` directory:
 #### 2. GitHub Actions CI/CD Workflow (`.github/workflows/release.yml`)
 The GitHub Actions workflow triggers automatically when a release tag is pushed:
 ```pwsh
-git tag v2.6.0
-git push origin v2.6.0
+git tag v2.7.1
+git push origin v2.7.1
 ```
 It can also be manually dispatched via the **Actions** tab in GitHub.
 
@@ -422,7 +422,7 @@ It can also be manually dispatched via the **Actions** tab in GitHub.
 #### 3. Verifying Authenticity & Trusting Self-Signed Certificates
 * **Verify GitHub Build Provenance**:
   ```pwsh
-  gh attestation verify DigitalClock-v2.6.0-win-x64.zip --owner Only-Bimal
+  gh attestation verify DigitalClock-v2.7.1-win-x64.zip --owner Only-Bimal
   ```
 * **Install Public Certificate (Optional)**:
   To eliminate the Windows SmartScreen unknown publisher prompt for self-signed builds, you can optionally install `DigitalClock-PublicCert.cer`:

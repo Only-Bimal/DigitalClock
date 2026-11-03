@@ -136,6 +136,8 @@ namespace DigitalClock
             }
 
             SetWindowLongPtr(hwnd, GWL_EXSTYLE, new IntPtr(style));
+            SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
         }
     }
 }

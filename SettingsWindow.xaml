@@ -353,7 +353,7 @@
 								<DockPanel Margin="0,4,0,8">
 									<Image x:Name="ImgAboutIcon" Width="40" Height="40" Margin="0,0,12,0" VerticalAlignment="Center"/>
 									<StackPanel VerticalAlignment="Center">
-										<TextBlock x:Name="TxtAppTitle" Text="Digital Clock v2.6" FontWeight="Bold" FontSize="15"/>
+										<TextBlock x:Name="TxtAppTitle" Text="Digital Clock v2.7.1" FontWeight="Bold" FontSize="15"/>
 										<TextBlock Text="A lightweight, modern desktop clock built with .NET 10 &amp; WPF." Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" Margin="0,2,0,0"/>
 									</StackPanel>
 								</DockPanel>

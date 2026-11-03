@@ -19,6 +19,7 @@ namespace DigitalClock
         private Color _cachedColor = Colors.Cyan;
         private SettingsWindow? _activeSettingsWindow;
         private AppSettings _effectiveSettings = SettingsManager.Current.Settings;
+        public AppSettings EffectiveSettings => _effectiveSettings;
         private string _currentScreenDeviceName = string.Empty;
 
         private enum ResizeDirection
@@ -248,16 +249,19 @@ namespace DigitalClock
             if (settings.Appearance.ColorMode == ColorSelectionMode.WindowsAccent)
             {
                 textColor = ColorUtilities.GetWindowsAccentColor();
+                if (settings.Appearance.BackgroundStyle == ClockBackgroundStyle.Transparent ||
+                    settings.Appearance.BackgroundStyle == ClockBackgroundStyle.DarkFrostedPill)
+                {
+                    textColor = ColorUtilities.AdaptAccentColorForVisibility(textColor);
+                }
             }
             else
             {
                 textColor = ColorUtilities.ParseHexColor(settings.Appearance.CustomHexColor, Colors.White);
-            }
-
-            // Boost visibility for dark background
-            if (settings.Appearance.BackgroundStyle == ClockBackgroundStyle.DarkFrostedPill)
-            {
-                textColor = ColorUtilities.EnsureVisibleOnDark(textColor);
+                if (settings.Appearance.BackgroundStyle == ClockBackgroundStyle.DarkFrostedPill)
+                {
+                    textColor = ColorUtilities.EnsureVisibleOnDark(textColor);
+                }
             }
 
             if (_cachedColor != textColor)
@@ -280,20 +284,20 @@ namespace DigitalClock
             ClockTimes.FontFamily = font;
             ClockDates.FontFamily = font;
 
-            // 6. Drop Shadow (illumination from top-left, casting shadow towards bottom-right)
+            // 6. Drop Shadow & 360° Contrast Halo (illumination and ambient edge separation for any wallpaper)
             if (settings.Appearance.EnableDropShadow)
             {
                 TimeShadowEffect.Color = Colors.Black;
-                TimeShadowEffect.ShadowDepth = 4;
-                TimeShadowEffect.BlurRadius = 9;
+                TimeShadowEffect.ShadowDepth = 1.5;
+                TimeShadowEffect.BlurRadius = 10;
                 TimeShadowEffect.Direction = 315;
-                TimeShadowEffect.Opacity = 0.70;
+                TimeShadowEffect.Opacity = 0.85;
 
                 DateShadowEffect.Color = Colors.Black;
-                DateShadowEffect.ShadowDepth = 4;
-                DateShadowEffect.BlurRadius = 9;
+                DateShadowEffect.ShadowDepth = 1.5;
+                DateShadowEffect.BlurRadius = 8;
                 DateShadowEffect.Direction = 315;
-                DateShadowEffect.Opacity = 0.70;
+                DateShadowEffect.Opacity = 0.85;
             }
             else
             {
@@ -915,34 +919,34 @@ namespace DigitalClock
 
         private void MenuAlwaysOnTop_Click(object sender, RoutedEventArgs e)
         {
-            var s = SettingsManager.Current.Settings;
-            s.Behavior.AlwaysOnTop = MenuAlwaysOnTop.IsChecked;
+            _effectiveSettings.Behavior.AlwaysOnTop = MenuAlwaysOnTop.IsChecked;
+            SettingsManager.Current.Settings.Behavior.AlwaysOnTop = MenuAlwaysOnTop.IsChecked;
             SettingsManager.Current.Save();
-            ApplySettings(s);
+            ApplySettings(_effectiveSettings);
         }
 
         private void MenuLockPosition_Click(object sender, RoutedEventArgs e)
         {
-            var s = SettingsManager.Current.Settings;
-            s.Behavior.LockPosition = MenuLockPosition.IsChecked;
+            _effectiveSettings.Behavior.LockPosition = MenuLockPosition.IsChecked;
+            SettingsManager.Current.Settings.Behavior.LockPosition = MenuLockPosition.IsChecked;
             SettingsManager.Current.Save();
-            ApplySettings(s);
+            ApplySettings(_effectiveSettings);
         }
 
         private void MenuClickThrough_Click(object sender, RoutedEventArgs e)
         {
-            var s = SettingsManager.Current.Settings;
-            s.Behavior.ClickThrough = MenuClickThrough.IsChecked;
+            _effectiveSettings.Behavior.ClickThrough = MenuClickThrough.IsChecked;
+            SettingsManager.Current.Settings.Behavior.ClickThrough = MenuClickThrough.IsChecked;
             SettingsManager.Current.Save();
-            ApplySettings(s);
+            ApplySettings(_effectiveSettings);
         }
 
         private void MenuStartWithWindows_Click(object sender, RoutedEventArgs e)
         {
-            var s = SettingsManager.Current.Settings;
-            s.Behavior.StartWithWindows = MenuStartWithWindows.IsChecked;
+            _effectiveSettings.Behavior.StartWithWindows = MenuStartWithWindows.IsChecked;
+            SettingsManager.Current.Settings.Behavior.StartWithWindows = MenuStartWithWindows.IsChecked;
             SettingsManager.Current.Save();
-            ApplySettings(s);
+            ApplySettings(_effectiveSettings);
         }
 
         private void MenuSnapPrimary_Click(object sender, RoutedEventArgs e) => SnapTo(SnapPosition.Center, Screen.PrimaryScreen);
